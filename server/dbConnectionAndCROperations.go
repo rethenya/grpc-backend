@@ -42,7 +42,7 @@ func dbConnection() {
 		fmt.Fprintf(os.Stderr, "Table creation: %v\n", error)
 		os.Exit(1)
 	}
-	//fmt.Println(success)
+	fmt.Println("success")
 
 	_, newerr := conn.Exec(context.Background(), "insert into seaports(id,name,code,city,state,country) values ($1,$2,$3,$4,$5,$6)", uuid.NewV4().String(), "nikhil", "vdy789", "erode", "tamilnadu", "india")
 	if newerr != nil {
