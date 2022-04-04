@@ -6,29 +6,25 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v4"
-	uuid "github.com/satori/go.uuid"
 )
 
+var db pgx.Conn
+
 func dbConnection() {
-	conn, err := pgx.Connect(context.Background(), os.Getenv("postgresql://localhost:5432/ports"))
+	conn, err := pgx.Connect(context.Background(), os.Getenv("postgresql://localhost:5432/Rethenya"))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
 	}
 	defer conn.Close(context.Background())
 
-	/*extensions := `
-	CREATE EXTENSION "pgcrypto";`
+}
 
-	_, error2 := conn.Exec(context.Background(), extensions)
-	if error2 != nil {
-		fmt.Fprintf(os.Stderr, "Extension creation: %v\n", error2)
-		os.Exit(1)
-	}*/
-
-	createSql := ` 
-	create table if not exists seaports(
-		id UUID DEFAULT gen_random_uuid(),
+func createTable() {
+	createSql :=
+		` 
+	Create table if not exists ports(
+		id SERIAL PRIMARY KEY,
 		name VARCHAR,
 		code VARCHAR,
 		city VARCHAR,
@@ -37,81 +33,52 @@ func dbConnection() {
 	);
 	`
 
-	_, error := conn.Exec(context.Background(), createSql)
+	_, error := db.Exec(context.Background(), createSql)
 	if error != nil {
-		fmt.Fprintf(os.Stderr, "Table creation: %v\n", error)
+		fmt.Fprintf(os.Stderr, "Table creation failed: %v\n", error)
 		os.Exit(1)
 	}
-	fmt.Println("success")
-
-	_, newerr := conn.Exec(context.Background(), "insert into seaports(id,name,code,city,state,country) values ($1,$2,$3,$4,$5,$6)", uuid.NewV4().String(), "nikhil", "vdy789", "erode", "tamilnadu", "india")
+}
+func Createnewport(id, name, code, city, state, country string) {
+	_, newerr := db.Exec(context.Background(), "Insert into ports(name,code,city,state,country) values ($1,$2,$3,$4,$5)", id, name, code, city, state, country)
 	if newerr != nil {
 		fmt.Fprintf(os.Stderr, "insertion failed: %v\n", newerr)
 		os.Exit(1)
 	}
-	_, newerr1 := conn.Exec(context.Background(), "insert into seaports(id,name,code,city,state,country) values ($1,$2,$3,$4,$5,$6)", uuid.NewV4().String(), "Rethenya", "vdu789", "tup", "tamilnadu", "india")
-	if newerr1 != nil {
-		fmt.Fprintf(os.Stderr, "insertion failed: %v\n", newerr1)
-		os.Exit(1)
-	}
-	results, newerr2 := conn.Exec(context.Background(), "select * from seaports")
-	if newerr2 != nil {
-		fmt.Fprintf(os.Stderr, "insertion failed: %v\n", newerr2)
-		os.Exit(1)
-	}
-	fmt.Println(results)
-
-	AllRows, errorRet := conn.Query(context.Background(), "select * from seaports")
-	if errorRet != nil {
-		fmt.Fprintf(os.Stderr, "Retrival Failed : %v\n", errorRet)
-		os.Exit(1)
-	}
-
-	defer AllRows.Close()
-
-	for AllRows.Next() {
-		values, err := AllRows.Values()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Retrival Failed : %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Println(values[0], values[1], values[2], values[3], values[4], values[5])
-	}
-
-	/*type Place struct {
-	    Country string
-	    City    sql.NullString
-	    TelCode int
-	}
-	 places := []Place{}
-	 err = db.Select(&places, "SELECT * FROM place ORDER BY telcode ASC")
-	 if err != nil {
-	     fmt.Println(err)
-	      return
-	 }*/
-
-}
-func Createnewport(id, name, code, city, state, country string) {
-	fmt.Println("Create")
 }
 
 func Getportdetails(id string) (Id, name, code, city, state, country string) {
-	fmt.Println("Fetch")
-	return "1", "2", "3", "4", "5", "6"
+	results, err := db.Query(context.Background(), "select * from ports where id=$1", id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "insertion failed: %v\n", err)
+		os.Exit(1)
+	}
+	error := results.Scan(&id, &name, &code, &city, &state, &country)
+	if error != nil {
+		fmt.Fprintf(os.Stderr, "Fetching the port detail failed:%v", error)
+	}
+	return id, name, code, city, state, country
 }
 
 func UpdatePortDetails(id, name, code, city, state, country string) {
-	fmt.Println("Update")
-
+	_, err := db.Exec(context.Background(), "Update ports set name=$1 where id=$2", id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Updating the port failed:%v", err)
+	}
 }
 
-func checkPortId(id string) bool {
-	if id == "" {
-		return false
+func checkPortId(id string) (isexists bool) {
+	result, err := db.Query(context.Background(), "select exists(select 1 from ports where id=$1)", id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Updating the port failed:%v", err)
 	}
-	return true
+	result.Scan(&isexists)
+	return isexists
 }
 
 func DeletePortDetails(id string) {
-	fmt.Println("Delete")
+	_, err := db.Exec(context.Background(), "Delete from ports where id=$2", id)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "deleting the port failed:%v", err)
+	}
 }
